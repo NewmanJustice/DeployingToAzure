@@ -30,3 +30,52 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
     const port = process.env.PORT || 3000;
     app.listen(port);
 
+## Step 1: Define variables
+```bash
+  # Azure
+  RG="CFT-software-engineering"
+  LOCATION="uksouth"
+  
+  # App Service
+  PLAN_NAME="hmctsdesignsystem-plan"
+  WEBAPP_NAME="hmctsdesignsystem-code"   # must be globally unique
+  
+  # Runtime
+  RUNTIME="NODE:20-lts"
+  
+  # Monorepo path (folder containing package.json)
+  APP_DIR="packages/hmcts-docs"
+  
+  # (Optional) Set subscription:
+  az account set --subscription <SUBSCRIPTION_ID>
+```
+
+## Step 2: Create an App Service Plan (Linux)
+```bash
+  az appservice plan create \
+  --name "$PLAN_NAME" \
+  --resource-group "$RG" \
+  --location "$LOCATION" \
+  --is-linux \
+  --sku B1
+```
+## Step 3: Create a code-based Linux Web App (NOT container)
+```bash
+  az webapp create \
+  --resource-group "$RG" \
+  --plan "$PLAN_NAME" \
+  --name "$WEBAPP_NAME" \
+  --runtime "$RUNTIME"
+
+  #Verify it is not container-based
+  az webapp show \
+    --name "$WEBAPP_NAME" \
+    --resource-group "$RG" \
+    --query "{kind:kind, linuxFxVersion:siteConfig.linuxFxVersion}" \
+    -o json
+```
+### Expected:
+- kind includes app,linux
+- linuxFxVersion is not DOCKER|...
+
+
