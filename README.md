@@ -168,3 +168,5 @@ jobs:
 Browser console shows:
 
 `Refused to apply style ... MIME type ('text/html')`
+
+This means the CSS URL is returning HTML, not CSS.
