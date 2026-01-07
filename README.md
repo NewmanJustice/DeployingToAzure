@@ -111,5 +111,52 @@ pbcopy < publishProfile.xml
 4. Name: AZURE_WEBAPP_PUBLISH_PROFILE
 5. Value: paste the full XML
    
-⚠️ ==Treat this like a password==.
+⚠️ Treat this like a password!
+
+## Step 6: GitHub Actions workflow (monorepo-aware)
+```bash
+  .github/workflows/deploy.yml
+```
+In this new file copy and paste this: 
+
+```yaml
+name: Deploy to Azure Web App
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: packages/hmcts-docs/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/hmcts-docs
+        run: npm ci
+
+      - name: Build (if present)
+        working-directory: packages/hmcts-docs
+        run: npm run build --if-present
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: hmctsdesignsystem-code
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: packages/hmcts-docs
+
+```
+
 
