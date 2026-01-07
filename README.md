@@ -53,19 +53,19 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
 ## Step 2: Create an App Service Plan (Linux)
 ```bash
   az appservice plan create \
-  --name "$PLAN_NAME" \
-  --resource-group "$RG" \
-  --location "$LOCATION" \
-  --is-linux \
-  --sku B1
+    --name "$PLAN_NAME" \
+    --resource-group "$RG" \
+    --location "$LOCATION" \
+    --is-linux \
+    --sku B1
 ```
 ## Step 3: Create a code-based Linux Web App (NOT container)
 ```bash
   az webapp create \
-  --resource-group "$RG" \
-  --plan "$PLAN_NAME" \
-  --name "$WEBAPP_NAME" \
-  --runtime "$RUNTIME"
+    --resource-group "$RG" \
+    --plan "$PLAN_NAME" \
+    --name "$WEBAPP_NAME" \
+    --runtime "$RUNTIME"
 
   #Verify it is not container-based
   az webapp show \
@@ -78,4 +78,37 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
 - kind includes app,linux
 - linuxFxVersion is not DOCKER|...
 
+## Step 4: (Optional) Configure app settings
+```bash
+az webapp config appsettings set \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG" \
+  --settings NODE_ENV=production
+```
+### Add any other required environment variables here.
+
+## Step 5: Download the Publish Profile (DO NOT COMMIT)
+```bash
+az webapp deployment list-publishing-profiles \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG" \
+  --xml > publishProfile.xml
+```
+### Add to .gitignore:
+```bash
+echo "publishProfile.xml" >> .gitignore
+git add .gitignore
+git commit -m "Ignore Azure publish profile"
+```
+### Copy contents to clipboard (Mac):
+```bash
+pbcopy < publishProfile.xml
+```
+### Add to GitHub Secrets
+1. Repo → Settings
+2. Secrets and variables → Actions
+3. New repository secret
+4. Name: AZURE_WEBAPP_PUBLISH_PROFILE
+5. Value: paste the full XML
+⚠️ Treat this like a password.
 
