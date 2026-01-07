@@ -114,10 +114,13 @@ pbcopy < publishProfile.xml
 ⚠️ Treat this like a password!
 
 ## Step 6: GitHub Actions workflow (monorepo-aware)
+
+Create this file at repo root:
+
 ```bash
   .github/workflows/deploy.yml
 ```
-In this new file copy and paste this: 
+In this new file copy and paste: 
 
 ```yaml
 name: Deploy to Azure Web App
@@ -158,5 +161,10 @@ jobs:
           package: packages/hmcts-docs
 
 ```
+## Step 7: Fix missing CSS / assets (very common)
 
+### Symptom
 
+Browser console shows:
+
+`Refused to apply style ... MIME type ('text/html')`
