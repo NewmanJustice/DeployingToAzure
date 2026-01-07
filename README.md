@@ -241,10 +241,3 @@ az appservice plan delete \
   --resource-group "$RG" \
   --yes
 ```
-
-# Key gotchas (learned the hard way) 😭
-- .github/workflows must live at repo root
-- Deploy subfolder, not repo root, in monorepos
-- Publish profile secret must be a repository secret
-- Express must listen on process.env.PORT
-- Static assets must be explicitly served
