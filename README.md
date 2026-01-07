@@ -30,6 +30,13 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
     const port = process.env.PORT || 3000;
     app.listen(port);
 
+## Key gotchas (learned the hard way) 😭
+- .github/workflows must live at repo root
+- Deploy subfolder, not repo root, in monorepos
+- Publish profile secret must be a repository secret
+- Express must listen on process.env.PORT
+- Static assets must be explicitly served
+
 ## Step 1: Define variables
 ```bash
   # Azure
@@ -170,3 +177,74 @@ Browser console shows:
 `Refused to apply style ... MIME type ('text/html')`
 
 This means the CSS URL is returning HTML, not CSS.
+
+### Step 7.1: Locate CSS in Azure (Kudu)
+Open:
+```bash
+  https://<WEBAPP_NAME>.scm.azurewebsites.net/DebugConsole
+```
+Run:
+```bash
+  find /home/site/wwwroot -maxdepth 6 -type f -name "*.css"
+```
+Example output:
+```bash
+  ./packages/hmcts-frontend/dist/hmcts.css
+```
+
+### Step 7.2: Serve assets in Express
+If your HTML references:
+` /assets/hmcts.css`
+Add this before routes in your Express app:
+```javascript
+const path = require("path");
+
+app.use(
+  "/assets",
+  express.static(
+    path.join(__dirname, "packages", "hmcts-frontend", "dist")
+  )
+);
+```
+After redeploy:
+[Content-Type: text/css] (https://<WEBAPP_NAME>.azurewebsites.net/assets/hmcts.css) should be returned 
+
+## Step 8: Logs & debugging
+
+### Enable and tail logs
+```bash
+az webapp log config \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG" \
+  --application-logging filesystem
+
+az webapp log tail \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG"
+```
+
+### Restart app
+```bash
+az webapp restart \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG"
+```
+
+## Step 9: Cleanup (optional)
+```bash
+az webapp delete \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG"
+
+az appservice plan delete \
+  --name "$PLAN_NAME" \
+  --resource-group "$RG" \
+  --yes
+```
+
+# Key gotchas (learned the hard way) 😭
+- .github/workflows must live at repo root
+- Deploy subfolder, not repo root, in monorepos
+- Publish profile secret must be a repository secret
+- Express must listen on process.env.PORT
+- Static assets must be explicitly served
