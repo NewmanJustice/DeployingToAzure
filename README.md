@@ -23,5 +23,10 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
 
 - Azure CLI installed and logged in:
   ```bash
-  ```az login
+  az login
+- GitHub repo with your Express app
+- Your app must listen on process.env.PORT:
+  ```javascript
+    const port = process.env.PORT || 3000;
+    app.listen(port);
 
