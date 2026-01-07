@@ -110,5 +110,6 @@ pbcopy < publishProfile.xml
 3. New repository secret
 4. Name: AZURE_WEBAPP_PUBLISH_PROFILE
 5. Value: paste the full XML
-⚠️ Treat this like a password.
+   
+⚠️ ==Treat this like a password==.
 
