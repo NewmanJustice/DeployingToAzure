@@ -21,14 +21,18 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
 
 ## Prerequisites
 
-- Azure CLI installed and logged in:
+- Azure CLI installed, **up to date**, and logged in:
   ```bash
+  az version  # Check current version
+  az upgrade  # Update if needed
   az login
+  ```
 - GitHub repo with your Express app
 - Your app must listen on process.env.PORT:
   ```javascript
     const port = process.env.PORT || 3000;
     app.listen(port);
+  ```
 
 ## Key gotchas (learned the hard way) 😭
 - .github/workflows must live at repo root
@@ -85,16 +89,51 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
 - kind includes app,linux
 - linuxFxVersion is not DOCKER|...
 
-## Step 4: (Optional) Configure app settings
+## Step 4: Enable SCM Basic Authentication
+Azure App Service may have Basic Authentication disabled by default, which prevents GitHub Actions deployments. Enable it:
+
+```bash
+# Enable Basic Auth for SCM (deployment)
+az resource update \
+  --resource-group "$RG" \
+  --name scm \
+  --namespace Microsoft.Web \
+  --resource-type basicPublishingCredentialsPolicies \
+  --parent sites/"$WEBAPP_NAME" \
+  --set properties.allow=true
+
+# Enable Basic Auth for FTP
+az resource update \
+  --resource-group "$RG" \
+  --name ftp \
+  --namespace Microsoft.Web \
+  --resource-type basicPublishingCredentialsPolicies \
+  --parent sites/"$WEBAPP_NAME" \
+  --set properties.allow=true
+```
+
+⚠️ **Important**: Without this step, you may get `401 Unauthorized` errors during deployment.
+
+## Step 5: Configure environment variables
 ```bash
 az webapp config appsettings set \
   --name "$WEBAPP_NAME" \
   --resource-group "$RG" \
-  --settings NODE_ENV=production
+  --settings \
+    NODE_ENV=production \
+    DOCS_USER="your-username" \
+    DOCS_PASS="your-password" \
+    ADMIN_PASSWORD="your-admin-password" \
+    SESSION_SECRET="$(openssl rand -base64 32)"
 ```
-### Add any other required environment variables here.
 
-## Step 5: Download the Publish Profile (DO NOT COMMIT)
+### Important Notes:
+- Set **all required environment variables** before the first deployment
+- If your app requires environment variables on startup, it will crash without them
+- Use secure, randomly generated values for secrets
+- Never commit secrets to your repository
+
+## Step 6: Download the Publish Profile (DO NOT COMMIT)
 ```bash
 az webapp deployment list-publishing-profiles \
   --name "$WEBAPP_NAME" \
@@ -120,7 +159,7 @@ pbcopy < publishProfile.xml
    
 ⚠️ Treat this like a password!
 
-## Step 6: GitHub Actions workflow (monorepo-aware)
+## Step 7: GitHub Actions workflow (monorepo-aware)
 
 Create this file at repo root:
 
@@ -163,12 +202,19 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: hmctsdesignsystem-code
+          app-name: hmctsdesignsystem-code  # Optional - can be omitted
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: packages/hmcts-docs
 
 ```
-## Step 7: Fix missing CSS / assets (very common)
+
+### Notes:
+- The `app-name` parameter is **optional** since the publish profile already contains this information
+- If you include `app-name`, ensure there are **no trailing spaces**
+- If deployment fails with "Publish profile is invalid", try removing the `app-name` line
+
+
+## Step 8: Fix missing CSS / assets (very common)
 
 ### Symptom
 
@@ -178,7 +224,7 @@ Browser console shows:
 
 This means the CSS URL is returning HTML, not CSS.
 
-### Step 7.1: Locate CSS in Azure (Kudu)
+### Step 8.1: Locate CSS in Azure (Kudu)
 Open:
 ```bash
   https://<WEBAPP_NAME>.scm.azurewebsites.net/DebugConsole
@@ -192,7 +238,7 @@ Example output:
   ./packages/hmcts-frontend/dist/hmcts.css
 ```
 
-### Step 7.2: Serve assets in Express
+### Step 8.2: Serve assets in Express
 If your HTML references:
 ` /assets/hmcts.css`
 Add this before routes in your Express app:
@@ -209,7 +255,7 @@ app.use(
 After redeploy:
 [Content-Type: text/css] (https://<WEBAPP_NAME>.azurewebsites.net/assets/hmcts.css) should be returned 
 
-## Step 8: Logs & debugging
+## Step 9: Logs & debugging
 
 ### Enable and tail logs
 ```bash
@@ -230,7 +276,113 @@ az webapp restart \
   --resource-group "$RG"
 ```
 
-## Step 9: Cleanup (optional)
+---
+
+## Troubleshooting
+
+### API Version Error
+**Error**: `The api-version '2023-01-01' is invalid. The supported versions are...`
+
+**Solution**: Your Azure CLI is outdated. Update it:
+```bash
+az upgrade
+```
+
+### Missing Resource in URI
+**Error**: `No HTTP resource was found that matches the request URI`
+
+**Solution**: The `--resource-group` parameter is missing or incorrect. Verify:
+```bash
+# List all resource groups
+az group list --output table
+
+# Ensure you're using the correct name in your commands
+az webapp show --name "$WEBAPP_NAME" --resource-group "$RG"
+```
+
+### 401 Unauthorized During Deployment
+**Error**: `Failed to deploy web package. Unauthorized (CODE: 401)`
+
+**Solution**: Enable SCM Basic Authentication (see Step 4):
+```bash
+az resource update \
+  --resource-group "$RG" \
+  --name scm \
+  --namespace Microsoft.Web \
+  --resource-type basicPublishingCredentialsPolicies \
+  --parent sites/"$WEBAPP_NAME" \
+  --set properties.allow=true
+```
+
+### Publish Profile Invalid Error
+**Error**: `Publish profile is invalid for app-name and slot-name provided`
+
+**Solutions**:
+1. **Remove trailing spaces** from `app-name` in your workflow YAML
+2. **Remove the app-name parameter entirely** - the publish profile already contains it:
+   ```yaml
+   - name: Deploy to Azure Web App
+     uses: azure/webapps-deploy@v3
+     with:
+       publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+       package: packages/hmcts-docs
+   ```
+3. **Regenerate the publish profile**:
+   ```bash
+   az webapp deployment list-publishing-profiles \
+     --name "$WEBAPP_NAME" \
+     --resource-group "$RG" \
+     --xml > publishProfile.xml
+   ```
+   Then update the GitHub secret with the fresh content
+
+### App Crashes on Startup
+**Error**: Missing environment variables (check logs for specific error)
+
+**Solution**:
+1. View logs to identify missing variables:
+   ```bash
+   az webapp log tail --name "$WEBAPP_NAME" --resource-group "$RG"
+   ```
+2. Set the required environment variables:
+   ```bash
+   az webapp config appsettings set \
+     --name "$WEBAPP_NAME" \
+     --resource-group "$RG" \
+     --settings VARIABLE_NAME="value"
+   ```
+3. Restart the app:
+   ```bash
+   az webapp restart --name "$WEBAPP_NAME" --resource-group "$RG"
+   ```
+
+### Verify Runtime Configuration
+Check that your Web App is using the correct Node.js runtime:
+```bash
+az webapp show \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG" \
+  --query "siteConfig.linuxFxVersion" -o tsv
+```
+Expected: `NODE|20-lts`
+
+### Check Deployment Status
+```bash
+# Check if app is running
+az webapp show \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG" \
+  --query "state" -o tsv
+
+# View recent deployment logs
+az webapp log deployment show \
+  --name "$WEBAPP_NAME" \
+  --resource-group "$RG"
+```
+
+---
+
+## Step 10: Cleanup (optional)
 ```bash
 az webapp delete \
   --name "$WEBAPP_NAME" \
