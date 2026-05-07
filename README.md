@@ -95,6 +95,17 @@ az webapp config appsettings set \
 ### Add any other required environment variables here.
 
 ## Step 5: Download the Publish Profile (DO NOT COMMIT)
+
+Set the basic auth to true before generating the publish profile
+```bash
+az resource update --resource-group "$RG" \
+--name scm \
+--namespace Microsoft.Web \
+--resource-type basicPublishingCredentialsPolicies \
+--parent sites/"$WEBAPP_NAME"\
+ --set properties.allow=true 
+```
+
 ```bash
 az webapp deployment list-publishing-profiles \
   --name "$WEBAPP_NAME" \
