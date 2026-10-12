@@ -44,18 +44,18 @@ This approach avoids Docker, ACR, private DNS, and container pull issues.
 ## Step 1: Define variables
 ```bash
   # Azure
-  RG="CFT-software-engineering"
+  RG="[Your resource group]"
   LOCATION="uksouth"
   
   # App Service
-  PLAN_NAME="hmctsdesignsystem-plan"
-  WEBAPP_NAME="hmctsdesignsystem-code"   # must be globally unique
+  PLAN_NAME="[Your plan name]"
+  WEBAPP_NAME="[Your app name]"   # must be globally unique
   
   # Runtime
   RUNTIME="NODE:20-lts"
   
   # Monorepo path (folder containing package.json)
-  APP_DIR="packages/hmcts-docs"
+  APP_DIR="[path to package.json]"
   
   # (Optional) Set subscription:
   az account set --subscription <SUBSCRIPTION_ID>
@@ -134,6 +134,18 @@ az webapp config appsettings set \
 - Never commit secrets to your repository
 
 ## Step 6: Download the Publish Profile (DO NOT COMMIT)
+## Step 5: Download the Publish Profile (DO NOT COMMIT)
+
+Set the basic auth to true before generating the publish profile
+```bash
+az resource update --resource-group "$RG" \
+--name scm \
+--namespace Microsoft.Web \
+--resource-type basicPublishingCredentialsPolicies \
+--parent sites/"$WEBAPP_NAME"\
+ --set properties.allow=true 
+```
+
 ```bash
 az webapp deployment list-publishing-profiles \
   --name "$WEBAPP_NAME" \
